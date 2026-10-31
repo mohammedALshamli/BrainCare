@@ -26,9 +26,21 @@ def create_caregiver(email="caregiver@example.com", **extra):
     )
 
 
-def link_caregiver(caregiver, patient, is_active=True):
+def link_caregiver(
+    caregiver,
+    patient,
+    is_active=True,
+    can_view=True,
+    can_edit_medications=False,
+    notify_missed_doses=True,
+):
     return CaregiverPatientLink.objects.create(
-        caregiver=caregiver, patient=patient, is_active=is_active
+        caregiver=caregiver,
+        patient=patient,
+        is_active=is_active,
+        can_view=can_view,
+        can_edit_medications=can_edit_medications,
+        notify_missed_doses=notify_missed_doses,
     )
 
 
