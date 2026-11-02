@@ -1,6 +1,7 @@
 from datetime import time
 
 from django.conf import settings
+from django.db import models
 from rest_framework import serializers
 
 from .models import DoseEvent, DoseOccurrence, Medication, MedicationSchedule
@@ -236,17 +237,20 @@ class DoseEventSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class DoseActionSource(models.TextChoices):
+    PATIENT_APP = "patient_app", "Patient app"
+    CAREGIVER_APP = "caregiver_app", "Caregiver app"
+    API = "api", "API"
+
+
 class DoseActionSerializer(serializers.Serializer):
     client_event_id = serializers.CharField(max_length=128)
     client_recorded_at = serializers.DateTimeField(
         required=False, allow_null=True
     )
     source = serializers.ChoiceField(
-        choices=[
-            DoseEvent.Source.PATIENT_APP,
-            DoseEvent.Source.API,
-        ],
-        default=DoseEvent.Source.PATIENT_APP,
+        choices=DoseActionSource.choices,
+        default=DoseActionSource.PATIENT_APP,
     )
 
 

@@ -181,7 +181,9 @@ class LoginTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(response.data["error"]["message"], "Invalid email or password.")
+        self.assertEqual(
+            response.data["error"]["message"], "Invalid email or password."
+        )
 
     def test_unknown_email_matches_wrong_password_response(self):
         unknown = self.client.post(
@@ -213,12 +215,16 @@ class LoginTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(response.data["error"]["message"], "Invalid email or password.")
+        self.assertEqual(
+            response.data["error"]["message"], "Invalid email or password."
+        )
 
     def test_malformed_login_request_does_not_reveal_details(self):
         response = self.client.post(LOGIN_URL, {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(response.data["error"]["message"], "Invalid email or password.")
+        self.assertEqual(
+            response.data["error"]["message"], "Invalid email or password."
+        )
 
 
 class TokenRefreshTests(APITestCase):

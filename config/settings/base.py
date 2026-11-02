@@ -21,6 +21,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-development-key-change-me")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+ADMIN_ENABLED = env.bool("DJANGO_ADMIN_ENABLED", default=DEBUG)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -31,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_filters",
     "rest_framework",
+    "drf_spectacular",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "apps.core",
@@ -38,6 +40,7 @@ INSTALLED_APPS = [
     "apps.medications",
     "apps.notifications",
     "apps.water",
+    "apps.sync",
 ]
 
 MIDDLEWARE = [
@@ -109,11 +112,14 @@ AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        )
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 8},
+        "OPTIONS": {"min_length": env.int("PASSWORD_MIN_LENGTH", default=12)},
     },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -158,9 +164,42 @@ REST_FRAMEWORK = {
         "pairing_redeem": env(
             "THROTTLE_PAIRING_REDEEM_RATE", default="10/min"
         ),
+        "sync": env("THROTTLE_SYNC_RATE", default="120/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPageNumberPagination",
     "PAGE_SIZE": env.int("DRF_PAGE_SIZE", default=50),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "BrainCare API",
+    "DESCRIPTION": (
+        "Backend API for patient medication tracking, caregiver pairing, "
+        "notifications, water intake, and offline synchronization."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": True,
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+    },
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "jwtAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+    },
+    "ENUM_NAME_OVERRIDES": {
+        "DoseEventSourceEnum": "apps.medications.models.DoseEvent.Source",
+        "DoseActionSourceEnum": "apps.medications.serializers.DoseActionSource",
+        "WaterIntakeSourceEnum": "apps.water.models.WaterIntakeLog.Source",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -170,6 +209,15 @@ DOSE_GENERATION_WINDOW_DAYS = env.int("DOSE_GENERATION_WINDOW_DAYS", default=14)
 DOSE_OVERDUE_GRACE_MINUTES = env.int("DOSE_OVERDUE_GRACE_MINUTES", default=30)
 DOSE_SNOOZE_DEFAULT_MINUTES = env.int("DOSE_SNOOZE_DEFAULT_MINUTES", default=10)
 DOSE_SNOOZE_MAX_MINUTES = env.int("DOSE_SNOOZE_MAX_MINUTES", default=1440)
+
+# ---------------------------------------------------------------------------
+# Offline synchronization
+# ---------------------------------------------------------------------------
+SYNC_PAGE_SIZE = env.int("SYNC_PAGE_SIZE", default=50)
+SYNC_MAX_BATCH_SIZE = env.int("SYNC_MAX_BATCH_SIZE", default=100)
+SYNC_MAX_CLIENT_CLOCK_SKEW_SECONDS = env.int(
+    "SYNC_MAX_CLIENT_CLOCK_SKEW_SECONDS", default=300
+)
 
 # ---------------------------------------------------------------------------
 # Patient-caregiver pairing
@@ -257,6 +305,18 @@ CELERY_TIMEZONE = "UTC"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=600)
 CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=540)
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Redis visibility must exceed the hard task limit so a redelivered task is
+# not handed to a second worker while the first is still running.
+CELERY_VISIBILITY_TIMEOUT = max(
+    env.int("CELERY_VISIBILITY_TIMEOUT", default=3600),
+    CELERY_TASK_TIME_LIMIT + 60,
+)
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "visibility_timeout": CELERY_VISIBILITY_TIMEOUT,
+}
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BEAT_SCHEDULE = {
     "generate-rolling-dose-occurrences": {
@@ -302,6 +362,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "filters": {
         "request_id": {"()": "config.logging.RequestIdFilter"},
+        "redact": {"()": "config.logging.SensitiveDataFilter"},
     },
     "formatters": {
         "json": {"()": "config.logging.JsonFormatter"},
@@ -313,7 +374,7 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": LOG_FORMAT if LOG_FORMAT in {"json", "plain"} else "json",
-            "filters": ["request_id"],
+            "filters": ["request_id", "redact"],
         },
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},

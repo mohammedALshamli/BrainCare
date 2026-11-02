@@ -157,6 +157,7 @@ class DoseOccurrence(models.Model):
         TAKEN = "taken", "Taken"
         SKIPPED = "skipped", "Skipped"
         OVERDUE_UNCONFIRMED = "overdue_unconfirmed", "Overdue / unconfirmed"
+        CANCELLED = "cancelled", "Cancelled (schedule changed)"
 
     class AlertStatus(models.TextChoices):
         NONE = "none", "None"
@@ -197,6 +198,15 @@ class DoseOccurrence(models.Model):
     skipped_at = models.DateTimeField(null=True, blank=True)
     snoozed_until = models.DateTimeField(null=True, blank=True)
     snooze_count = models.PositiveIntegerField(default=0)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.CharField(max_length=64, blank=True)
+    superseded_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supersedes",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -214,6 +224,7 @@ class DoseOccurrence(models.Model):
                         "taken",
                         "skipped",
                         "overdue_unconfirmed",
+                        "cancelled",
                     ]
                 ),
                 name="dose_status_valid",
@@ -239,6 +250,13 @@ class DoseOccurrence(models.Model):
                 condition=models.Q(status="skipped", skipped_at__isnull=False)
                 | ~models.Q(status="skipped"),
                 name="skipped_occurrence_requires_skipped_at",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status="cancelled", cancelled_at__isnull=False
+                )
+                | ~models.Q(status="cancelled"),
+                name="cancelled_occurrence_requires_cancelled_at",
             ),
         ]
         indexes = [

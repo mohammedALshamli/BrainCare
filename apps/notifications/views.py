@@ -1,6 +1,9 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.core.serializers import ErrorResponseSerializer
 
 from .models import Device
 from .serializers import DeviceRegistrationSerializer, DeviceSerializer
@@ -18,6 +21,8 @@ class DeviceViewSet(
     serializer_class = DeviceSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Device.objects.none()
         return Device.objects.filter(user=self.request.user)
 
     def get_serializer_class(self):
@@ -25,6 +30,15 @@ class DeviceViewSet(
             return DeviceRegistrationSerializer
         return DeviceSerializer
 
+    @extend_schema(
+        summary="Register an FCM device",
+        request=DeviceRegistrationSerializer,
+        responses={
+            201: DeviceSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

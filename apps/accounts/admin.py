@@ -19,7 +19,13 @@ class UserAdmin(BaseUserAdmin):
         "is_staff",
         "is_active",
     )
-    list_filter = ("is_patient", "is_caregiver", "is_staff", "is_superuser", "is_active")
+    list_filter = (
+        "is_patient",
+        "is_caregiver",
+        "is_staff",
+        "is_superuser",
+        "is_active",
+    )
     search_fields = ("email", "first_name", "last_name")
     ordering = ("email",)
     readonly_fields = ("date_joined", "last_login")

@@ -13,6 +13,13 @@ class PairingRedeemSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=64, trim_whitespace=True)
 
 
+class PairingCodeResponseSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    code = serializers.CharField()
+    qr_payload = serializers.CharField()
+    expires_at = serializers.DateTimeField()
+
+
 class CaregiverPatientLinkSerializer(serializers.ModelSerializer):
     patient_email = serializers.EmailField(source="patient.email", read_only=True)
     caregiver_email = serializers.EmailField(
@@ -30,6 +37,7 @@ class CaregiverPatientLinkSerializer(serializers.ModelSerializer):
             "is_active",
             "can_view",
             "can_edit_medications",
+            "can_confirm_doses",
             "notify_missed_doses",
             "consent_at",
             "revoked_at",
@@ -55,11 +63,23 @@ class CaregiverPatientLinkSerializer(serializers.ModelSerializer):
             "can_edit_medications",
             getattr(self.instance, "can_edit_medications", False),
         )
+        can_confirm = attrs.get(
+            "can_confirm_doses",
+            getattr(self.instance, "can_confirm_doses", False),
+        )
         if can_edit and not can_view:
             raise serializers.ValidationError(
                 {
                     "can_edit_medications": (
                         "Medication editing requires view permission."
+                    )
+                }
+            )
+        if can_confirm and not can_view:
+            raise serializers.ValidationError(
+                {
+                    "can_confirm_doses": (
+                        "Dose confirmation requires view permission."
                     )
                 }
             )

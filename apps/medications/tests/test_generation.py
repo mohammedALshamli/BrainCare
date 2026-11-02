@@ -1,5 +1,4 @@
 import threading
-from unittest.mock import patch
 import time as time_module
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 
@@ -77,7 +76,7 @@ class GenerationTests(TestCase):
         )
         generate_occurrences(self.schedule)
 
-        regenerate_future(self.schedule, remove_future_pending=True)
+        regenerate_future(self.schedule, cancel_future_pending=True)
 
         self.assertTrue(
             DoseOccurrence.objects.filter(pk=historical.pk).exists()

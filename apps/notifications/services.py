@@ -114,7 +114,7 @@ def enqueue_dose_overdue_notifications(occurrence, now=None):
                 f"dose-overdue:{occurrence.pk}:{link.caregiver_id}"
             ),
             recipient=link.caregiver,
-            patient_id=occurrence.patient_id,
+            patient=occurrence.patient,
             notification_type=NotificationOutbox.NotificationType.DOSE_OVERDUE,
             payload={
                 "title": "Medication reminder",
@@ -122,7 +122,10 @@ def enqueue_dose_overdue_notifications(occurrence, now=None):
                     "A scheduled dose is overdue. "
                     "Please check in with your patient."
                 ),
-                "data": {"type": "dose_overdue"},
+                "data": {
+                    "type": "dose_overdue",
+                    "occurrence_id": str(occurrence.pk),
+                },
             },
             now=now,
         )
@@ -260,6 +263,54 @@ def _finish_dead(outbox_id, reason, now):
         )
 
 
+def _outbox_occurrence_id(outbox):
+    payload = outbox.payload or {}
+    data = payload.get("data") or {}
+    occurrence_id = data.get("occurrence_id")
+    if occurrence_id:
+        return occurrence_id
+    parts = (outbox.idempotency_key or "").split(":")
+    if len(parts) >= 3 and parts[0] == "dose-overdue":
+        return parts[1]
+    return None
+
+
+def _current_occurrence_status(outbox):
+    occurrence_id = _outbox_occurrence_id(outbox)
+    if not occurrence_id:
+        return None
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from apps.medications.models import DoseOccurrence
+
+    try:
+        return (
+            DoseOccurrence.objects.filter(pk=occurrence_id)
+            .values_list("status", flat=True)
+            .first()
+        )
+    except (TypeError, ValueError, DjangoValidationError):
+        return None
+
+
+def _suppress_locked(outbox, reason, now):
+    outbox.status = NotificationOutbox.Status.SUPPRESSED
+    outbox.suppression_reason = reason
+    outbox.suppressed_at = now
+    outbox.processing_started_at = None
+    outbox.last_error = reason
+    outbox.save(
+        update_fields=[
+            "status",
+            "suppression_reason",
+            "suppressed_at",
+            "processing_started_at",
+            "last_error",
+            "updated_at",
+        ]
+    )
+
+
 def dispatch_outbox(outbox_id, now=None):
     """Claim and dispatch one outbox row. Safe to call repeatedly."""
     now = now or timezone.now()
@@ -288,6 +339,18 @@ def dispatch_outbox(outbox_id, now=None):
             and outbox.next_attempt_at > now
         ):
             return "not_due"
+
+        # A dose may be confirmed or skipped after the overdue outbox row was
+        # created but before this worker runs. Re-check the durable occurrence
+        # state inside the same row lock before sending a false alert.
+        if outbox.notification_type == NotificationOutbox.NotificationType.DOSE_OVERDUE:
+            current_status = _current_occurrence_status(outbox)
+            if current_status in {"taken", "skipped", "cancelled"}:
+                _suppress_locked(
+                    outbox, "stale_dose_already_resolved", now
+                )
+                return "suppressed_stale"
+
         if outbox.attempts >= outbox.max_attempts:
             outbox.status = NotificationOutbox.Status.DEAD_LETTER
             outbox.processing_started_at = None
@@ -341,7 +404,8 @@ def dispatch_outbox(outbox_id, now=None):
     except FCMNotConfigured:
         _finish_dead(outbox.pk, "fcm_not_configured", now)
         return "fcm_not_configured"
-    except Exception:  # noqa: BLE001 - provider failures are retried, not logged with payload
+    except Exception:  # noqa: BLE001
+        # Provider failures are retried without logging the payload.
         logger.warning(
             "FCM dispatch raised for outbox %s", outbox.pk, exc_info=True
         )

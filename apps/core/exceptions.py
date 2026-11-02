@@ -39,7 +39,9 @@ STATUS_MESSAGES = {
     status.HTTP_403_FORBIDDEN: "You do not have permission to perform this action.",
     status.HTTP_404_NOT_FOUND: "Not found.",
     status.HTTP_405_METHOD_NOT_ALLOWED: "Method not allowed.",
-    status.HTTP_406_NOT_ACCEPTABLE: "Could not satisfy the requested content negotiation.",
+    status.HTTP_406_NOT_ACCEPTABLE: (
+        "Could not satisfy the requested content negotiation."
+    ),
     status.HTTP_409_CONFLICT: "The request conflicts with the current state.",
     status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: "Unsupported media type.",
     status.HTTP_429_TOO_MANY_REQUESTS: "Request was throttled. Try again later.",

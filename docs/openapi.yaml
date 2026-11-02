@@ -1,0 +1,3233 @@
+openapi: 3.0.3
+info:
+  title: BrainCare API
+  version: 1.0.0
+  description: Backend API for patient medication tracking, caregiver pairing, notifications,
+    water intake, and offline synchronization.
+paths:
+  /api/v1/auth/login/:
+    post:
+      operationId: api_v1_auth_login_create
+      summary: Log in with email and password
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/auth/logout/:
+    post:
+      operationId: api_v1_auth_logout_create
+      summary: Blacklist a refresh token
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/auth/me/:
+    get:
+      operationId: api_v1_auth_me_retrieve
+      summary: Return the authenticated user
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/auth/refresh/:
+    post:
+      operationId: api_v1_auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/auth/register/:
+    post:
+      operationId: api_v1_auth_register_create
+      summary: Register a user
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/devices/:
+    get:
+      operationId: api_v1_devices_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDeviceList'
+          description: ''
+    post:
+      operationId: api_v1_devices_create
+      summary: Register an FCM device
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistrationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/devices/{id}/:
+    get:
+      operationId: api_v1_devices_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this device.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+          description: ''
+    delete:
+      operationId: api_v1_devices_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this device.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/doses/:
+    get:
+      operationId: api_v1_doses_list
+      parameters:
+      - in: query
+        name: from_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: medication
+        schema:
+          type: string
+          format: uuid
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: patient
+        schema:
+          type: number
+      - in: query
+        name: schedule
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: scheduled_at__gte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: scheduled_at__lte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: scheduled_date
+        schema:
+          type: string
+          format: date
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - cancelled
+          - overdue_unconfirmed
+          - pending
+          - skipped
+          - taken
+        description: |-
+          * `pending` - Pending
+          * `taken` - Taken
+          * `skipped` - Skipped
+          * `overdue_unconfirmed` - Overdue / unconfirmed
+          * `cancelled` - Cancelled (schedule changed)
+      - in: query
+        name: to_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDoseOccurrenceList'
+          description: ''
+  /api/v1/doses/{id}/:
+    get:
+      operationId: api_v1_doses_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this dose occurrence.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoseOccurrence'
+          description: ''
+  /api/v1/doses/{id}/confirm/:
+    post:
+      operationId: api_v1_doses_confirm_create
+      description: Patient or authorized caregiver action. The client_event_id is
+        an idempotency key; replaying it returns the original result without a second
+        event.
+      summary: Confirm a dose occurrence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this dose occurrence.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoseOccurrence'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/doses/{id}/events/:
+    get:
+      operationId: api_v1_doses_events_list
+      summary: List audit events for a dose occurrence
+      parameters:
+      - in: query
+        name: from_date
+        schema:
+          type: string
+          format: date
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this dose occurrence.
+        required: true
+      - in: query
+        name: medication
+        schema:
+          type: string
+          format: uuid
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: patient
+        schema:
+          type: number
+      - in: query
+        name: schedule
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: scheduled_at__gte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: scheduled_at__lte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: scheduled_date
+        schema:
+          type: string
+          format: date
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - cancelled
+          - overdue_unconfirmed
+          - pending
+          - skipped
+          - taken
+        description: |-
+          * `pending` - Pending
+          * `taken` - Taken
+          * `skipped` - Skipped
+          * `overdue_unconfirmed` - Overdue / unconfirmed
+          * `cancelled` - Cancelled (schedule changed)
+      - in: query
+        name: to_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDoseEventList'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/doses/{id}/skip/:
+    post:
+      operationId: api_v1_doses_skip_create
+      description: Patient or authorized caregiver action with idempotent client_event_id.
+      summary: Skip a dose occurrence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this dose occurrence.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DoseActionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoseOccurrence'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/doses/{id}/snooze/:
+    post:
+      operationId: api_v1_doses_snooze_create
+      description: Patient or authorized caregiver action with idempotent client_event_id.
+      summary: Snooze a dose occurrence
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this dose occurrence.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoseSnoozeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DoseSnoozeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DoseSnoozeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoseOccurrence'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/medications/:
+    get:
+      operationId: api_v1_medications_list
+      parameters:
+      - in: query
+        name: end_date__gte
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: end_date__lte
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: patient
+        schema:
+          type: number
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: start_date__gte
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date__lte
+        schema:
+          type: string
+          format: date
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMedicationList'
+          description: ''
+    post:
+      operationId: api_v1_medications_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+          description: ''
+  /api/v1/medications/{medication_id}/schedules/:
+    get:
+      operationId: api_v1_medications_schedules_list
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: path
+        name: medication_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: schedule_type
+        schema:
+          type: string
+          enum:
+          - fixed_times
+          - interval_hours
+          - weekdays
+        description: |-
+          * `fixed_times` - Fixed daily times
+          * `weekdays` - Selected weekdays and times
+          * `interval_hours` - Every N hours
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMedicationScheduleList'
+          description: ''
+    post:
+      operationId: api_v1_medications_schedules_create
+      parameters:
+      - in: path
+        name: medication_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicationSchedule'
+          description: ''
+  /api/v1/medications/{id}/:
+    get:
+      operationId: api_v1_medications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this medication.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+          description: ''
+    put:
+      operationId: api_v1_medications_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this medication.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+          description: ''
+    patch:
+      operationId: api_v1_medications_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this medication.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+          description: ''
+  /api/v1/medications/{id}/deactivate/:
+    post:
+      operationId: api_v1_medications_deactivate_create
+      summary: Deactivate a medication
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this medication.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/pairing/codes/:
+    post:
+      operationId: api_v1_pairing_codes_create
+      summary: Generate a one-time caregiver pairing code
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingCodeCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PairingCodeCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PairingCodeCreateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingCodeResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/pairing/redeem/:
+    post:
+      operationId: api_v1_pairing_redeem_create
+      summary: Redeem a caregiver pairing code
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingRedeemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PairingRedeemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PairingRedeemRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaregiverPatientLink'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/pairing/relationships/:
+    get:
+      operationId: api_v1_pairing_relationships_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCaregiverPatientLinkList'
+          description: ''
+  /api/v1/pairing/relationships/{id}/:
+    get:
+      operationId: api_v1_pairing_relationships_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this caregiver patient link.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaregiverPatientLink'
+          description: ''
+    put:
+      operationId: api_v1_pairing_relationships_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this caregiver patient link.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaregiverPatientLinkRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CaregiverPatientLinkRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CaregiverPatientLinkRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaregiverPatientLink'
+          description: ''
+    patch:
+      operationId: api_v1_pairing_relationships_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this caregiver patient link.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCaregiverPatientLinkRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCaregiverPatientLinkRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCaregiverPatientLinkRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaregiverPatientLink'
+          description: ''
+  /api/v1/pairing/relationships/{id}/revoke/:
+    post:
+      operationId: api_v1_pairing_relationships_revoke_create
+      summary: Revoke a caregiver relationship
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this caregiver patient link.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaregiverPatientLink'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/schedules/{id}/:
+    get:
+      operationId: api_v1_schedules_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicationSchedule'
+          description: ''
+    put:
+      operationId: api_v1_schedules_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MedicationScheduleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicationSchedule'
+          description: ''
+    patch:
+      operationId: api_v1_schedules_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationScheduleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationScheduleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicationScheduleRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicationSchedule'
+          description: ''
+  /api/v1/schedules/{id}/deactivate/:
+    post:
+      operationId: api_v1_schedules_deactivate_create
+      summary: Deactivate a medication schedule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicationSchedule'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/sync/changes/:
+    get:
+      operationId: api_v1_sync_changes_retrieve
+      description: Cursor-based change feed. The cursor is a monotonic server sequence,
+        not a timestamp. Apply changes in order and persist next_cursor transactionally.
+      summary: Download changed records
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: integer
+        description: Last applied cursor.
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: 1-200 records.
+      - in: query
+        name: patient
+        schema:
+          type: integer
+        description: Linked patient id for caregiver access.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncChangesResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/sync/push/:
+    post:
+      operationId: api_v1_sync_push_create
+      description: Apply client-generated UUID events. Each item receives its own
+        status. Retrying the same client_event_id is idempotent.
+      summary: Push offline events
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPushResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/water/intake/:
+    get:
+      operationId: api_v1_water_intake_list
+      parameters:
+      - in: query
+        name: consumed_at__gte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: consumed_at__lte
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: from_date
+        schema:
+          type: string
+          format: date
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: patient
+        schema:
+          type: number
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: source
+        schema:
+          type: string
+          enum:
+          - cup
+          - manual
+          - quick_add
+        description: |-
+          * `manual` - Manual
+          * `cup` - Cup
+          * `quick_add` - Quick add
+      - in: query
+        name: to_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWaterIntakeLogList'
+          description: ''
+    post:
+      operationId: api_v1_water_intake_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WaterIntakeLogRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WaterIntakeLogRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WaterIntakeLogRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterIntakeLog'
+          description: ''
+  /api/v1/water/intake/{id}/:
+    get:
+      operationId: api_v1_water_intake_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterIntakeLog'
+          description: ''
+  /api/v1/water/settings/:
+    get:
+      operationId: api_v1_water_settings_retrieve
+      summary: Read water reminder settings
+      parameters:
+      - in: query
+        name: patient
+        schema:
+          type: integer
+        description: Linked patient id for caregiver access.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterReminderSettings'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    put:
+      operationId: api_v1_water_settings_update
+      summary: Replace water reminder settings
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WaterReminderSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WaterReminderSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WaterReminderSettingsRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterReminderSettings'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    patch:
+      operationId: api_v1_water_settings_partial_update
+      summary: Update water reminder settings
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedWaterReminderSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedWaterReminderSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedWaterReminderSettingsRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterReminderSettings'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/water/summary/:
+    get:
+      operationId: api_v1_water_summary_retrieve
+      summary: Read a daily water summary
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: Local date in YYYY-MM-DD format.
+      - in: query
+        name: patient
+        schema:
+          type: integer
+        description: Linked patient id for caregiver access.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterSummary'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+components:
+  schemas:
+    AlertStatusEnum:
+      enum:
+      - none
+      - pending
+      - sent
+      - acknowledged
+      - failed
+      type: string
+      description: |-
+        * `none` - None
+        * `pending` - Pending
+        * `sent` - Sent
+        * `acknowledged` - Acknowledged
+        * `failed` - Failed
+    CaregiverPatientLink:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        patient:
+          type: integer
+          readOnly: true
+        patient_email:
+          type: string
+          format: email
+          readOnly: true
+        caregiver:
+          type: integer
+          readOnly: true
+        caregiver_email:
+          type: string
+          format: email
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          default: true
+        can_view:
+          type: boolean
+        can_edit_medications:
+          type: boolean
+        can_confirm_doses:
+          type: boolean
+        notify_missed_doses:
+          type: boolean
+        consent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - caregiver
+      - caregiver_email
+      - consent_at
+      - created_at
+      - id
+      - is_active
+      - patient
+      - patient_email
+      - revoked_at
+      - updated_at
+    CaregiverPatientLinkRequest:
+      type: object
+      properties:
+        can_view:
+          type: boolean
+        can_edit_medications:
+          type: boolean
+        can_confirm_doses:
+          type: boolean
+        notify_missed_doses:
+          type: boolean
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        device_identifier:
+          type: string
+          readOnly: true
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          readOnly: true
+        token_preview:
+          type: string
+          readOnly: true
+        device_name:
+          type: string
+          readOnly: true
+        app_version:
+          type: string
+          readOnly: true
+        os_version:
+          type: string
+          readOnly: true
+        metadata:
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        last_seen_at:
+          type: string
+          format: date-time
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - app_version
+      - created_at
+      - device_identifier
+      - device_name
+      - id
+      - is_active
+      - last_seen_at
+      - metadata
+      - os_version
+      - platform
+      - token_preview
+      - updated_at
+    DeviceRegistrationRequest:
+      type: object
+      properties:
+        fcm_token:
+          type: string
+          writeOnly: true
+          minLength: 20
+          maxLength: 4096
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        device_identifier:
+          type: string
+          maxLength: 128
+        device_name:
+          type: string
+          maxLength: 120
+        app_version:
+          type: string
+          maxLength: 50
+        os_version:
+          type: string
+          maxLength: 50
+        metadata: {}
+      required:
+      - fcm_token
+      - platform
+    DoseActionRequest:
+      type: object
+      properties:
+        client_event_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        client_recorded_at:
+          type: string
+          format: date-time
+          nullable: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/DoseActionSourceEnum'
+          default: patient_app
+      required:
+      - client_event_id
+    DoseActionSourceEnum:
+      enum:
+      - patient_app
+      - caregiver_app
+      - api
+      type: string
+      description: |-
+        * `patient_app` - Patient app
+        * `caregiver_app` - Caregiver app
+        * `api` - API
+    DoseEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          readOnly: true
+        actor:
+          type: integer
+          readOnly: true
+          nullable: true
+        actor_email:
+          type: string
+          format: email
+          readOnly: true
+        client_event_id:
+          type: string
+          readOnly: true
+          nullable: true
+        client_recorded_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        server_received_at:
+          type: string
+          format: date-time
+          readOnly: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/DoseEventSourceEnum'
+          readOnly: true
+        payload:
+          readOnly: true
+      required:
+      - actor
+      - actor_email
+      - client_event_id
+      - client_recorded_at
+      - event_type
+      - id
+      - payload
+      - server_received_at
+      - source
+    DoseEventSourceEnum:
+      enum:
+      - patient_app
+      - caregiver_app
+      - system
+      - api
+      - admin
+      type: string
+      description: |-
+        * `patient_app` - Patient app
+        * `caregiver_app` - Caregiver app
+        * `system` - System
+        * `api` - API
+        * `admin` - Admin
+    DoseMedication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        strength:
+          type: string
+          readOnly: true
+        dosage_form:
+          type: string
+          readOnly: true
+        dose_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          readOnly: true
+          nullable: true
+        dose_unit:
+          type: string
+          readOnly: true
+      required:
+      - dosage_form
+      - dose_amount
+      - dose_unit
+      - id
+      - name
+      - strength
+    DoseOccurrence:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        medication:
+          allOf:
+          - $ref: '#/components/schemas/DoseMedication'
+          readOnly: true
+        schedule:
+          allOf:
+          - $ref: '#/components/schemas/DoseSchedule'
+          readOnly: true
+        scheduled_at:
+          type: string
+          format: date-time
+          readOnly: true
+        scheduled_date:
+          type: string
+          format: date
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/DoseOccurrenceStatusEnum'
+          readOnly: true
+        alert_status:
+          allOf:
+          - $ref: '#/components/schemas/AlertStatusEnum'
+          readOnly: true
+        taken_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        skipped_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        snoozed_until:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        snooze_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - alert_status
+      - created_at
+      - id
+      - medication
+      - schedule
+      - scheduled_at
+      - scheduled_date
+      - skipped_at
+      - snooze_count
+      - snoozed_until
+      - status
+      - taken_at
+      - updated_at
+    DoseOccurrenceStatusEnum:
+      enum:
+      - pending
+      - taken
+      - skipped
+      - overdue_unconfirmed
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `taken` - Taken
+        * `skipped` - Skipped
+        * `overdue_unconfirmed` - Overdue / unconfirmed
+        * `cancelled` - Cancelled (schedule changed)
+    DoseSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        schedule_type:
+          allOf:
+          - $ref: '#/components/schemas/ScheduleTypeEnum'
+          readOnly: true
+        timezone:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - schedule_type
+      - timezone
+    DoseSnoozeRequest:
+      type: object
+      properties:
+        client_event_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        client_recorded_at:
+          type: string
+          format: date-time
+          nullable: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/DoseActionSourceEnum'
+          default: patient_app
+        minutes:
+          type: integer
+          minimum: 1
+          nullable: true
+      required:
+      - client_event_id
+    EntityTypeEnum:
+      enum:
+      - medication
+      - schedule
+      - dose_occurrence
+      - dose_event
+      - water_intake
+      - water_settings
+      type: string
+      description: |-
+        * `medication` - Medication
+        * `schedule` - Medication schedule
+        * `dose_occurrence` - Dose occurrence
+        * `dose_event` - Dose event
+        * `water_intake` - Water intake
+        * `water_settings` - Water settings
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details: {}
+        request_id:
+          type: string
+      required:
+      - code
+      - message
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+      required:
+      - error
+    EventTypeEnum:
+      enum:
+      - taken
+      - skipped
+      - snoozed
+      - confirmed_late
+      - overdue
+      - reminder_sent
+      - escalation_sent
+      - escalation_acknowledged
+      type: string
+      description: |-
+        * `taken` - Taken
+        * `skipped` - Skipped
+        * `snoozed` - Snoozed
+        * `confirmed_late` - Confirmed late
+        * `overdue` - Marked overdue
+        * `reminder_sent` - Reminder sent
+        * `escalation_sent` - Escalation sent
+        * `escalation_acknowledged` - Escalation acknowledged
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    LoginResponse:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - refresh
+      - user
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    LogoutResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    Medication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        patient:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        strength:
+          type: string
+          maxLength: 100
+        dosage_form:
+          type: string
+          maxLength: 100
+        instructions:
+          type: string
+        dose_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+        dose_unit:
+          type: string
+          maxLength: 50
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+        created_by:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - id
+      - name
+      - patient
+      - start_date
+      - updated_at
+    MedicationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        strength:
+          type: string
+          maxLength: 100
+        dosage_form:
+          type: string
+          maxLength: 100
+        instructions:
+          type: string
+        dose_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+        dose_unit:
+          type: string
+          maxLength: 50
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+      required:
+      - name
+      - start_date
+    MedicationSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        medication:
+          type: string
+          format: uuid
+          readOnly: true
+        schedule_type:
+          $ref: '#/components/schemas/ScheduleTypeEnum'
+        times:
+          type: array
+          items:
+            type: string
+        weekdays:
+          type: array
+          items:
+            type: integer
+        interval_hours:
+          type: integer
+          maximum: 24
+          minimum: 1
+          nullable: true
+        anchor_time:
+          type: string
+          format: time
+        timezone:
+          type: string
+          default: UTC
+        is_active:
+          type: boolean
+        created_by:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - id
+      - medication
+      - schedule_type
+      - updated_at
+    MedicationScheduleRequest:
+      type: object
+      properties:
+        schedule_type:
+          $ref: '#/components/schemas/ScheduleTypeEnum'
+        times:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        weekdays:
+          type: array
+          items:
+            type: integer
+        interval_hours:
+          type: integer
+          maximum: 24
+          minimum: 1
+          nullable: true
+        anchor_time:
+          type: string
+          format: time
+        timezone:
+          type: string
+          minLength: 1
+          default: UTC
+        is_active:
+          type: boolean
+      required:
+      - schedule_type
+    OperationEnum:
+      enum:
+      - upsert
+      - delete
+      type: string
+      description: |-
+        * `upsert` - Upsert
+        * `delete` - Delete (tombstone)
+    PaginatedCaregiverPatientLinkList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaregiverPatientLink'
+    PaginatedDeviceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+    PaginatedDoseEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseEvent'
+    PaginatedDoseOccurrenceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseOccurrence'
+    PaginatedMedicationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Medication'
+    PaginatedMedicationScheduleList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedicationSchedule'
+    PaginatedWaterIntakeLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WaterIntakeLog'
+    PairingCodeCreateRequest:
+      type: object
+      properties:
+        expires_in_minutes:
+          type: integer
+          maximum: 60
+          minimum: 1
+    PairingCodeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        qr_payload:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - code
+      - expires_at
+      - id
+      - qr_payload
+    PairingRedeemRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - code
+    PatchedCaregiverPatientLinkRequest:
+      type: object
+      properties:
+        can_view:
+          type: boolean
+        can_edit_medications:
+          type: boolean
+        can_confirm_doses:
+          type: boolean
+        notify_missed_doses:
+          type: boolean
+    PatchedMedicationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        strength:
+          type: string
+          maxLength: 100
+        dosage_form:
+          type: string
+          maxLength: 100
+        instructions:
+          type: string
+        dose_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+        dose_unit:
+          type: string
+          maxLength: 50
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+    PatchedMedicationScheduleRequest:
+      type: object
+      properties:
+        schedule_type:
+          $ref: '#/components/schemas/ScheduleTypeEnum'
+        times:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        weekdays:
+          type: array
+          items:
+            type: integer
+        interval_hours:
+          type: integer
+          maximum: 24
+          minimum: 1
+          nullable: true
+        anchor_time:
+          type: string
+          format: time
+        timezone:
+          type: string
+          minLength: 1
+          default: UTC
+        is_active:
+          type: boolean
+    PatchedWaterReminderSettingsRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        interval_minutes:
+          type: integer
+          maximum: 720
+          minimum: 15
+        daily_goal_ml:
+          type: integer
+          maximum: 20000
+          minimum: 100
+          nullable: true
+        cup_size_ml:
+          type: integer
+          maximum: 2000
+          minimum: 50
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+    PlatformEnum:
+      enum:
+      - android
+      - ios
+      - web
+      type: string
+      description: |-
+        * `android` - Android
+        * `ios` - iOS
+        * `web` - Web
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 1
+        first_name:
+          type: string
+          default: ''
+          maxLength: 150
+        last_name:
+          type: string
+          default: ''
+          maxLength: 150
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolesEnum'
+          writeOnly: true
+      required:
+      - email
+      - password
+      - password_confirm
+      - roles
+    RolesEnum:
+      enum:
+      - patient
+      - caregiver
+      type: string
+      description: |-
+        * `patient` - patient
+        * `caregiver` - caregiver
+    ScheduleTypeEnum:
+      enum:
+      - fixed_times
+      - weekdays
+      - interval_hours
+      type: string
+      description: |-
+        * `fixed_times` - Fixed daily times
+        * `weekdays` - Selected weekdays and times
+        * `interval_hours` - Every N hours
+    SyncChange:
+      type: object
+      properties:
+        cursor:
+          type: integer
+          readOnly: true
+        entity_type:
+          allOf:
+          - $ref: '#/components/schemas/EntityTypeEnum'
+          readOnly: true
+        object_id:
+          type: string
+          format: uuid
+          readOnly: true
+        operation:
+          allOf:
+          - $ref: '#/components/schemas/OperationEnum'
+          readOnly: true
+        data:
+          readOnly: true
+        patient:
+          type: integer
+          readOnly: true
+        changed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - changed_at
+      - cursor
+      - data
+      - entity_type
+      - object_id
+      - operation
+      - patient
+    SyncChangesResponse:
+      type: object
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncChange'
+        next_cursor:
+          type: integer
+        has_more:
+          type: boolean
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - changes
+      - has_more
+      - next_cursor
+      - server_time
+    SyncPushCounts:
+      type: object
+      properties:
+        applied:
+          type: integer
+        duplicate:
+          type: integer
+        conflict:
+          type: integer
+        error:
+          type: integer
+      required:
+      - applied
+      - conflict
+      - duplicate
+      - error
+    SyncPushItemRequest:
+      type: object
+      properties:
+        client_event_id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        occurrence_id:
+          type: string
+          format: uuid
+        client_recorded_at:
+          type: string
+          format: date-time
+          nullable: true
+        expected_version:
+          type: integer
+          minimum: 0
+          nullable: true
+        minutes:
+          type: integer
+          minimum: 1
+        amount_ml:
+          type: integer
+          maximum: 5000
+          minimum: 1
+        consumed_at:
+          type: string
+          format: date-time
+          nullable: true
+        source:
+          type: string
+          default: manual
+          maxLength: 20
+        notes:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - client_event_id
+      - type
+    SyncPushRequest:
+      type: object
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        device_identifier:
+          type: string
+          maxLength: 128
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPushItemRequest'
+      required:
+      - changes
+    SyncPushResponse:
+      type: object
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPushResult'
+        counts:
+          $ref: '#/components/schemas/SyncPushCounts'
+      required:
+      - counts
+      - results
+    SyncPushResult:
+      type: object
+      properties:
+        client_event_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        status:
+          $ref: '#/components/schemas/SyncPushResultStatusEnum'
+        code:
+          type: string
+        message:
+          type: string
+        occurrence_id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        water_intake_id:
+          type: string
+          format: uuid
+        server: {}
+      required:
+      - client_event_id
+      - status
+      - type
+    SyncPushResultStatusEnum:
+      enum:
+      - applied
+      - duplicate
+      - conflict
+      - not_found
+      - forbidden
+      - error
+      type: string
+      description: |-
+        * `applied` - applied
+        * `duplicate` - duplicate
+        * `conflict` - conflict
+        * `not_found` - not_found
+        * `forbidden` - forbidden
+        * `error` - error
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TypeEnum:
+      enum:
+      - dose.confirm
+      - dose.skip
+      - dose.snooze
+      - water.intake.create
+      type: string
+      description: |-
+        * `dose.confirm` - Confirm dose
+        * `dose.skip` - Skip dose
+        * `dose.snooze` - Snooze dose
+        * `water.intake.create` - Create water intake
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email address
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        is_patient:
+          type: boolean
+          readOnly: true
+        is_caregiver:
+          type: boolean
+          readOnly: true
+        roles:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_joined
+      - email
+      - first_name
+      - id
+      - is_caregiver
+      - is_patient
+      - last_name
+      - roles
+    WaterIntakeLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        patient:
+          type: integer
+          readOnly: true
+        client_event_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        amount_ml:
+          type: integer
+          maximum: 5000
+          minimum: 1
+        consumed_at:
+          type: string
+          format: date-time
+        local_date:
+          type: string
+          format: date
+          readOnly: true
+        source:
+          $ref: '#/components/schemas/WaterIntakeSourceEnum'
+        notes:
+          type: string
+          maxLength: 255
+        created_by:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount_ml
+      - client_event_id
+      - created_at
+      - created_by
+      - id
+      - local_date
+      - patient
+      - updated_at
+    WaterIntakeLogRequest:
+      type: object
+      properties:
+        amount_ml:
+          type: integer
+          maximum: 5000
+          minimum: 1
+        consumed_at:
+          type: string
+          format: date-time
+        source:
+          $ref: '#/components/schemas/WaterIntakeSourceEnum'
+        notes:
+          type: string
+          maxLength: 255
+      required:
+      - amount_ml
+    WaterIntakeSourceEnum:
+      enum:
+      - manual
+      - cup
+      - quick_add
+      type: string
+      description: |-
+        * `manual` - Manual
+        * `cup` - Cup
+        * `quick_add` - Quick add
+    WaterReminderSettings:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        patient:
+          type: integer
+          readOnly: true
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        interval_minutes:
+          type: integer
+          maximum: 720
+          minimum: 15
+        daily_goal_ml:
+          type: integer
+          maximum: 20000
+          minimum: 100
+          nullable: true
+        cup_size_ml:
+          type: integer
+          maximum: 2000
+          minimum: 50
+        timezone:
+          type: string
+          maxLength: 64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - patient
+      - updated_at
+    WaterReminderSettingsRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        interval_minutes:
+          type: integer
+          maximum: 720
+          minimum: 15
+        daily_goal_ml:
+          type: integer
+          maximum: 20000
+          minimum: 100
+          nullable: true
+        cup_size_ml:
+          type: integer
+          maximum: 2000
+          minimum: 50
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+    WaterSummary:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        total_ml:
+          type: integer
+        goal_ml:
+          type: integer
+          nullable: true
+        remaining_ml:
+          type: integer
+          nullable: true
+        progress_percentage:
+          type: integer
+          nullable: true
+        log_count:
+          type: integer
+        goal_reached:
+          type: boolean
+          nullable: true
+      required:
+      - date
+      - goal_ml
+      - goal_reached
+      - log_count
+      - progress_percentage
+      - remaining_ml
+      - total_ml
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -87,6 +87,16 @@ class RegisterSerializer(serializers.Serializer):
         )
 
 
+class LoginResponseSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    user = UserSerializer()
+
+
+class LogoutResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)

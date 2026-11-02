@@ -19,7 +19,9 @@ class WaterReminderSettings(models.Model):
     start_time = models.TimeField(default=time(8, 0))
     end_time = models.TimeField(default=time(20, 0))
     interval_minutes = models.PositiveSmallIntegerField(default=60)
-    daily_goal_ml = models.PositiveIntegerField(default=2000)
+    daily_goal_ml = models.PositiveIntegerField(
+        null=True, blank=True, default=None
+    )
     cup_size_ml = models.PositiveIntegerField(default=250)
     timezone = models.CharField(max_length=64, default="UTC")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,7 +42,8 @@ class WaterReminderSettings(models.Model):
                 name="water_interval_between_15_and_720",
             ),
             models.CheckConstraint(
-                condition=models.Q(
+                condition=models.Q(daily_goal_ml__isnull=True)
+                | models.Q(
                     daily_goal_ml__gte=100,
                     daily_goal_ml__lte=20000,
                 ),
@@ -71,6 +74,7 @@ class WaterIntakeLog(models.Model):
         on_delete=models.CASCADE,
         related_name="water_intake_logs",
     )
+    client_event_id = models.UUIDField(null=True, blank=True, unique=True)
     amount_ml = models.PositiveIntegerField()
     consumed_at = models.DateTimeField(default=timezone.now)
     local_date = models.DateField()

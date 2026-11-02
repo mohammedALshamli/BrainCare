@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.medications.models import Medication
+from apps.medications.models import DoseOccurrence, Medication
 from apps.medications.tests.utils import (
     create_caregiver,
     create_medication,
@@ -211,9 +211,11 @@ class MedicationUpdateTests(APITestCase):
         self.assertTrue(
             self.medication.dose_occurrences.filter(pk=historical.pk).exists()
         )
-        self.assertFalse(
-            self.medication.dose_occurrences.filter(pk=future.pk).exists()
+        future.refresh_from_db()
+        self.assertEqual(
+            future.status, DoseOccurrence.Status.CANCELLED
         )
+        self.assertIsNotNone(future.cancelled_at)
 
     def test_deactivate_is_idempotent(self):
         first = self.client.post(

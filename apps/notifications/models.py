@@ -92,6 +92,7 @@ class NotificationOutbox(models.Model):
         ACCEPTED = "accepted", "Accepted by provider"
         FAILED = "failed", "Failed"
         DEAD_LETTER = "dead_letter", "Dead letter"
+        SUPPRESSED = "suppressed", "Suppressed (no longer relevant)"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     idempotency_key = models.CharField(max_length=255, unique=True)
@@ -117,6 +118,8 @@ class NotificationOutbox(models.Model):
     next_attempt_at = models.DateTimeField(default=timezone.now)
     processing_started_at = models.DateTimeField(null=True, blank=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+    suppressed_at = models.DateTimeField(null=True, blank=True)
+    suppression_reason = models.CharField(max_length=64, blank=True)
     last_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

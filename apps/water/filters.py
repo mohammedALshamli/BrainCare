@@ -4,7 +4,7 @@ from .models import WaterIntakeLog
 
 
 class WaterIntakeFilter(django_filters.FilterSet):
-    patient = django_filters.UUIDFilter(field_name="patient_id")
+    patient = django_filters.NumberFilter(field_name="patient_id")
     date = django_filters.DateFilter(field_name="local_date", lookup_expr="exact")
     from_date = django_filters.DateFilter(
         field_name="local_date", lookup_expr="gte"

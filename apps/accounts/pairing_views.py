@@ -1,4 +1,5 @@
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -6,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsCaregiver, IsPatient
+from apps.core.serializers import ErrorResponseSerializer
 
 from .models import CaregiverPatientLink
 from .pairing import (
@@ -17,6 +19,7 @@ from .pairing import (
 from .pairing_serializers import (
     CaregiverPatientLinkSerializer,
     PairingCodeCreateSerializer,
+    PairingCodeResponseSerializer,
     PairingRedeemSerializer,
 )
 from .permissions import IsRelationshipParticipant, IsRelationshipPatient
@@ -26,6 +29,16 @@ class PairingCodeGenerateView(APIView):
     permission_classes = [IsAuthenticated, IsPatient]
     throttle_scope = "pairing_generate"
 
+    @extend_schema(
+        summary="Generate a one-time caregiver pairing code",
+        request=PairingCodeCreateSerializer,
+        responses={
+            201: PairingCodeResponseSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            429: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         serializer = PairingCodeCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -50,6 +63,17 @@ class PairingCodeRedeemView(APIView):
     permission_classes = [IsAuthenticated, IsCaregiver]
     throttle_scope = "pairing_redeem"
 
+    @extend_schema(
+        summary="Redeem a caregiver pairing code",
+        request=PairingRedeemSerializer,
+        responses={
+            201: CaregiverPatientLinkSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            429: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         serializer = PairingRedeemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -71,6 +95,8 @@ class RelationshipViewSet(
     serializer_class = CaregiverPatientLinkSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return CaregiverPatientLink.objects.none()
         user = self.request.user
         return CaregiverPatientLink.objects.filter(
             Q(patient=user) | Q(caregiver=user)
@@ -83,6 +109,15 @@ class RelationshipViewSet(
             return [IsAuthenticated(), IsRelationshipParticipant()]
         return [IsAuthenticated(), IsRelationshipParticipant()]
 
+    @extend_schema(
+        summary="Revoke a caregiver relationship",
+        request=None,
+        responses={
+            200: CaregiverPatientLinkSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def revoke(self, request, pk=None):
         link = self.get_object()

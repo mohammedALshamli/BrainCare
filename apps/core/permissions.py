@@ -49,6 +49,29 @@ def editable_patient_ids(user):
     return list(dict.fromkeys(patient_ids))
 
 
+def can_confirm_dose(user, patient_id) -> bool:
+    """Whether ``user`` may confirm/skip a dose for ``patient_id``.
+
+    Patients may always act on their own doses. A caregiver needs an active,
+    viewable link with the dedicated ``can_confirm_doses`` permission; editing
+    medication data is deliberately not sufficient.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_patient and user.pk == patient_id:
+        return True
+    if not user.is_caregiver:
+        return False
+    return CaregiverPatientLink.objects.filter(
+        caregiver=user,
+        patient_id=patient_id,
+        is_active=True,
+        can_view=True,
+        can_confirm_doses=True,
+        patient__is_active=True,
+    ).exists()
+
+
 def can_read_patient(user, patient_id) -> bool:
     return patient_id in set(accessible_patient_ids(user))
 
@@ -120,6 +143,18 @@ class IsOwnerOrLinkedCaregiver(BasePermission):
             return is_linked_caregiver(request.user, patient_id)
 
         return False
+
+
+class IsPatientOrDoseConfirmer(BasePermission):
+    """Allow the owning patient or a caregiver with ``can_confirm_doses``."""
+
+    message = "You do not have permission to act on this dose."
+
+    def has_object_permission(self, request, view, obj):
+        patient_id = getattr(obj, "patient_id", None)
+        if patient_id is None:
+            return False
+        return can_confirm_dose(request.user, patient_id)
 
 
 class IsPatientOwner(BasePermission):

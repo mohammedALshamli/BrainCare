@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, mixins, status, viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, SAFE_METHODS
@@ -10,11 +11,13 @@ from rest_framework.views import APIView
 from apps.core.permissions import (
     IsOwnerOrLinkedCaregiver,
     IsPatient,
-    IsPatientOwner,
+    IsPatientOrDoseConfirmer,
     IsPatientOwnerOrCaregiverEditor,
     accessible_patient_ids,
     can_edit_patient,
 )
+from apps.core.serializers import ErrorResponseSerializer
+from apps.sync import services as sync_services
 
 from .filters import (
     DoseOccurrenceFilter,
@@ -82,10 +85,11 @@ class MedicationViewSet(
         return [IsAuthenticated(), IsOwnerOrLinkedCaregiver()]
 
     def perform_create(self, serializer):
-        serializer.save(
+        medication = serializer.save(
             patient=self.request.user,
             created_by=self.request.user,
         )
+        sync_services.record_medication(medication, actor=self.request.user)
 
     def perform_update(self, serializer):
         with transaction.atomic():
@@ -106,8 +110,20 @@ class MedicationViewSet(
                 for schedule in medication.schedules.filter(
                     is_active=True
                 ).select_related("medication"):
-                    regenerate_future(schedule, remove_future_pending=True)
+                    regenerate_future(schedule, cancel_future_pending=True)
+            sync_services.record_medication(
+                medication, actor=self.request.user
+            )
 
+    @extend_schema(
+        summary="Deactivate a medication",
+        request=None,
+        responses={
+            200: MedicationSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def deactivate(self, request, pk=None):
         medication = self.get_object()
@@ -130,6 +146,8 @@ class ScheduleListCreateView(generics.ListCreateAPIView):
         return get_object_or_404(queryset)
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return MedicationSchedule.objects.none()
         medication = self.get_medication()
         return MedicationSchedule.objects.filter(
             medication=medication
@@ -158,6 +176,7 @@ class ScheduleListCreateView(generics.ListCreateAPIView):
                 medication=medication,
                 created_by=self.request.user,
             )
+            sync_services.record_schedule(schedule, actor=self.request.user)
             generate_occurrences(schedule)
 
 
@@ -197,9 +216,10 @@ class ScheduleDetailView(generics.RetrieveUpdateAPIView):
             if not updated.is_active:
                 deactivate_schedule(updated)
             elif material_change or not was_active:
-                regenerate_future(updated, remove_future_pending=True)
+                regenerate_future(updated, cancel_future_pending=True)
             else:
                 generate_occurrences(updated)
+            sync_services.record_schedule(updated, actor=self.request.user)
 
 
 class ScheduleDeactivateView(APIView):
@@ -208,6 +228,15 @@ class ScheduleDeactivateView(APIView):
         IsPatientOwnerOrCaregiverEditor,
     ]
 
+    @extend_schema(
+        summary="Deactivate a medication schedule",
+        request=None,
+        responses={
+            200: MedicationScheduleSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     def post(self, request, pk):
         queryset = MedicationSchedule.objects.filter(
             medication__patient_id__in=accessible_patient_ids(request.user)
@@ -228,15 +257,40 @@ class DoseOccurrenceViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ("-scheduled_at",)
 
     def get_queryset(self):
-        return DoseOccurrence.objects.filter(
+        queryset = DoseOccurrence.objects.filter(
             patient_id__in=accessible_patient_ids(self.request.user)
         ).select_related("medication", "schedule", "patient")
+        if (
+            self.action == "list"
+            and not self.request.query_params.get("status")
+        ):
+            # Cancelled rows remain addressable by id for offline clients but
+            # do not clutter the default active-dose list.
+            queryset = queryset.exclude(
+                status=DoseOccurrence.Status.CANCELLED
+            )
+        return queryset
 
     def get_permissions(self):
         if self.action in ("confirm", "skip", "snooze"):
-            return [IsAuthenticated(), IsPatientOwner()]
+            return [IsAuthenticated(), IsPatientOrDoseConfirmer()]
         return [IsAuthenticated(), IsOwnerOrLinkedCaregiver()]
 
+    @extend_schema(
+        summary="Confirm a dose occurrence",
+        description=(
+            "Patient or authorized caregiver action. The client_event_id is an idempotency key; "
+            "replaying it returns the original result without a second event."
+        ),
+        request=DoseActionSerializer,
+        responses={
+            200: DoseOccurrenceSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
         occurrence = self.get_object()
@@ -253,6 +307,18 @@ class DoseOccurrenceViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(self.get_serializer(occurrence).data)
 
+    @extend_schema(
+        summary="Skip a dose occurrence",
+        description="Patient or authorized caregiver action with idempotent client_event_id.",
+        request=DoseActionSerializer,
+        responses={
+            200: DoseOccurrenceSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def skip(self, request, pk=None):
         occurrence = self.get_object()
@@ -269,6 +335,18 @@ class DoseOccurrenceViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(self.get_serializer(occurrence).data)
 
+    @extend_schema(
+        summary="Snooze a dose occurrence",
+        description="Patient or authorized caregiver action with idempotent client_event_id.",
+        request=DoseSnoozeSerializer,
+        responses={
+            200: DoseOccurrenceSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def snooze(self, request, pk=None):
         occurrence = self.get_object()
@@ -286,6 +364,14 @@ class DoseOccurrenceViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(self.get_serializer(occurrence).data)
 
+    @extend_schema(
+        summary="List audit events for a dose occurrence",
+        responses={
+            200: DoseEventSerializer(many=True),
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["get"])
     def events(self, request, pk=None):
         occurrence = self.get_object()

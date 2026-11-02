@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import CaregiverPatientLink, PairingCode
+from apps.accounts.pairing import cleanup_pairing_codes
 from apps.medications.tests.utils import (
     create_caregiver,
     create_patient,
@@ -141,12 +142,13 @@ class PairingCodeTests(APITestCase):
         response = self.redeem(code)
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
-    def test_revoked_relationship_can_be_reactivated_with_new_code(self):
+    def test_re_pairing_preserves_historical_revoked_link(self):
+        revoked_at = timezone.now()
         link = link_caregiver(
             self.caregiver, self.patient, can_edit_medications=True
         )
         link.is_active = False
-        link.revoked_at = timezone.now()
+        link.revoked_at = revoked_at
         link.save()
 
         code = self.generate().data["code"]
@@ -154,8 +156,24 @@ class PairingCodeTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         link.refresh_from_db()
-        self.assertTrue(link.is_active)
-        self.assertFalse(link.can_edit_medications)
+        self.assertFalse(link.is_active)
+        self.assertEqual(link.revoked_at, revoked_at)
+        self.assertTrue(link.can_edit_medications)
+
+        active = CaregiverPatientLink.objects.get(
+            caregiver=self.caregiver,
+            patient=self.patient,
+            is_active=True,
+        )
+        self.assertNotEqual(active.pk, link.pk)
+        self.assertFalse(active.can_edit_medications)
+        self.assertFalse(active.can_confirm_doses)
+        self.assertEqual(
+            CaregiverPatientLink.objects.filter(
+                caregiver=self.caregiver, patient=self.patient
+            ).count(),
+            2,
+        )
 
 
 class RelationshipTests(APITestCase):
@@ -195,6 +213,26 @@ class RelationshipTests(APITestCase):
         self.link.refresh_from_db()
         self.assertTrue(self.link.can_edit_medications)
 
+    def test_patient_can_grant_and_revoke_confirm_dose_permission(self):
+        self.client.force_authenticate(self.patient)
+        response = self.client.patch(
+            reverse("pairing:relationship-detail", args=[self.link.pk]),
+            {"can_confirm_doses": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.can_confirm_doses)
+
+        revoke = self.client.patch(
+            reverse("pairing:relationship-detail", args=[self.link.pk]),
+            {"can_confirm_doses": False},
+            format="json",
+        )
+        self.assertEqual(revoke.status_code, status.HTTP_200_OK)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.can_confirm_doses)
+
     def test_caregiver_cannot_change_permissions(self):
         self.client.force_authenticate(self.caregiver)
         response = self.client.patch(
@@ -209,6 +247,15 @@ class RelationshipTests(APITestCase):
         response = self.client.patch(
             reverse("pairing:relationship-detail", args=[self.link.pk]),
             {"can_view": False, "can_edit_medications": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_confirm_permission_requires_view_permission(self):
+        self.client.force_authenticate(self.patient)
+        response = self.client.patch(
+            reverse("pairing:relationship-detail", args=[self.link.pk]),
+            {"can_view": False, "can_confirm_doses": True},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -238,3 +285,49 @@ class RelationshipTests(APITestCase):
             reverse("pairing:relationship-revoke", args=[self.link.pk])
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class PairingCleanupTests(APITestCase):
+    def setUp(self):
+        self.patient = create_patient()
+
+    def make_code(self, **overrides):
+        defaults = {
+            "patient": self.patient,
+            "code_hash": "a" * 64,
+            "expires_at": timezone.now() + timedelta(minutes=10),
+        }
+        defaults.update(overrides)
+        return PairingCode.objects.create(**defaults)
+
+    def test_old_codes_are_deleted_after_retention(self):
+        now = timezone.now()
+        old = self.make_code(
+            code_hash="b" * 64,
+            expires_at=now - timedelta(days=8),
+        )
+        recent = self.make_code(
+            code_hash="c" * 64,
+            expires_at=now - timedelta(days=1),
+        )
+        used_old = self.make_code(
+            code_hash="d" * 64,
+            used_at=now - timedelta(days=8),
+        )
+
+        deleted = cleanup_pairing_codes(now=now, retention_days=7)
+
+        self.assertEqual(deleted, 2)
+        self.assertFalse(PairingCode.objects.filter(pk=old.pk).exists())
+        self.assertFalse(PairingCode.objects.filter(pk=used_old.pk).exists())
+        self.assertTrue(PairingCode.objects.filter(pk=recent.pk).exists())
+
+    def test_invalidated_codes_are_cleaned_after_retention(self):
+        now = timezone.now()
+        invalidated = self.make_code(
+            code_hash="e" * 64,
+            invalidated_at=now - timedelta(days=8),
+        )
+        deleted = cleanup_pairing_codes(now=now, retention_days=7)
+        self.assertEqual(deleted, 1)
+        self.assertFalse(PairingCode.objects.filter(pk=invalidated.pk).exists())

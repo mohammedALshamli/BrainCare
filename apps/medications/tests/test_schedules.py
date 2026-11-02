@@ -200,10 +200,19 @@ class ScheduleUpdateTests(APITestCase):
             )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        occurrences = DoseOccurrence.objects.filter(schedule=self.schedule)
+        occurrences = DoseOccurrence.objects.filter(
+            schedule=self.schedule,
+            status=DoseOccurrence.Status.PENDING,
+        )
         self.assertGreater(occurrences.count(), 0)
         for occurrence in occurrences:
             self.assertEqual(occurrence.scheduled_at.hour, 9)
+        self.assertTrue(
+            DoseOccurrence.objects.filter(
+                schedule=self.schedule,
+                status=DoseOccurrence.Status.CANCELLED,
+            ).exists()
+        )
 
     def test_material_change_preserves_historical_completed_occurrences(self):
         from apps.medications.services import generate_occurrences

@@ -22,6 +22,8 @@ staticfiles/
 media/
 .local/
 .env
+.env.docker
+.env.production
 
 # Testing / coverage
 .pytest_cache/

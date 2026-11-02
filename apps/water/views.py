@@ -1,8 +1,6 @@
-import uuid
-
-from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import generics
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,12 +11,15 @@ from apps.core.permissions import (
     accessible_patient_ids,
     can_read_patient,
 )
+from apps.core.serializers import ErrorResponseSerializer
+from apps.sync import services as sync_services
 
 from .filters import WaterIntakeFilter
 from .models import WaterIntakeLog
 from .serializers import (
     WaterIntakeLogSerializer,
     WaterReminderSettingsSerializer,
+    WaterSummarySerializer,
 )
 from .services import (
     daily_summary,
@@ -31,12 +32,12 @@ def resolve_patient(request, required=True):
     raw_patient = request.query_params.get("patient")
     if raw_patient:
         try:
-            patient_id = uuid.UUID(str(raw_patient))
-        except (ValueError, TypeError) as exc:
-            raise ValidationError({"patient": "Invalid patient id."}) from exc
-        if not can_read_patient(request.user, patient_id):
+            patient = User.objects.get(pk=raw_patient, is_patient=True)
+        except (User.DoesNotExist, ValueError, TypeError) as exc:
+            raise NotFound("Patient not found.") from exc
+        if not can_read_patient(request.user, patient.pk):
             raise NotFound("Patient not found.")
-        return get_object_or_404(User, pk=patient_id, is_patient=True)
+        return patient
 
     if request.user.is_patient:
         return request.user
@@ -53,14 +54,47 @@ class WaterSettingsView(APIView):
             return [IsAuthenticated(), IsPatient()]
         return [IsAuthenticated()]
 
+    @extend_schema(
+        summary="Read water reminder settings",
+        parameters=[
+            OpenApiParameter(
+                "patient",
+                int,
+                description="Linked patient id for caregiver access.",
+            )
+        ],
+        responses={
+            200: WaterReminderSettingsSerializer,
+            400: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     def get(self, request):
         patient = resolve_patient(request)
         settings_obj = get_or_create_settings(patient)
         return Response(WaterReminderSettingsSerializer(settings_obj).data)
 
+    @extend_schema(
+        summary="Replace water reminder settings",
+        request=WaterReminderSettingsSerializer,
+        responses={
+            200: WaterReminderSettingsSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    )
     def put(self, request):
         return self._update(request, partial=False)
 
+    @extend_schema(
+        summary="Update water reminder settings",
+        request=WaterReminderSettingsSerializer,
+        responses={
+            200: WaterReminderSettingsSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    )
     def patch(self, request):
         return self._update(request, partial=True)
 
@@ -72,7 +106,8 @@ class WaterSettingsView(APIView):
             partial=partial,
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save(patient=request.user)
+        settings_obj = serializer.save(patient=request.user)
+        sync_services.record_water_settings(settings_obj, actor=request.user)
         return Response(serializer.data)
 
 
@@ -106,6 +141,24 @@ class WaterIntakeDetailView(generics.RetrieveAPIView):
 class WaterSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Read a daily water summary",
+        parameters=[
+            OpenApiParameter(
+                "patient",
+                int,
+                description="Linked patient id for caregiver access.",
+            ),
+            OpenApiParameter(
+                "date", str, description="Local date in YYYY-MM-DD format."
+            ),
+        ],
+        responses={
+            200: WaterSummarySerializer,
+            400: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     def get(self, request):
         patient = resolve_patient(request)
         settings_obj = get_or_create_settings(patient)

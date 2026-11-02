@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone as dt_timezone
+from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
@@ -32,6 +32,7 @@ def link_caregiver(
     is_active=True,
     can_view=True,
     can_edit_medications=False,
+    can_confirm_doses=False,
     notify_missed_doses=True,
 ):
     return CaregiverPatientLink.objects.create(
@@ -40,6 +41,7 @@ def link_caregiver(
         is_active=is_active,
         can_view=can_view,
         can_edit_medications=can_edit_medications,
+        can_confirm_doses=can_confirm_doses,
         notify_missed_doses=notify_missed_doses,
     )
 

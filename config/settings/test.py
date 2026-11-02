@@ -43,6 +43,7 @@ REST_FRAMEWORK = {
         "auth": None,
         "pairing_generate": None,
         "pairing_redeem": None,
+        "sync": None,
     },
 }
 

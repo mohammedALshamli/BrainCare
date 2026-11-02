@@ -123,7 +123,11 @@ def pairing_qr_payload(raw_code: str) -> str:
 
 
 def redeem_pairing_code(raw_code, caregiver, now=None):
-    """Consume a pairing code and create/reactivate a care relationship."""
+    """Consume a pairing code and create a new care relationship.
+
+    Revoked links are retained for audit history; re-pairing inserts a new
+    active row instead of mutating the old one.
+    """
     if not caregiver or not getattr(caregiver, "is_caregiver", False):
         raise PermissionDenied("Only caregivers can redeem pairing codes.")
 
@@ -151,12 +155,13 @@ def redeem_pairing_code(raw_code, caregiver, now=None):
             _record_failure(caregiver)
             raise ValidationError({"code": "Invalid or expired pairing code."})
 
-        link = (
+        active_link = (
             CaregiverPatientLink.objects.select_for_update()
-            .filter(caregiver=caregiver, patient=patient)
+            .filter(caregiver=caregiver, patient=patient, is_active=True)
             .first()
         )
-        if link is not None and link.is_active:
+        if active_link is not None:
+            # Retrying the same redemption cannot create a second active row.
             raise Conflict("An active care relationship already exists.")
 
         consumed = PairingCode.objects.filter(
@@ -169,34 +174,19 @@ def redeem_pairing_code(raw_code, caregiver, now=None):
             _record_failure(caregiver)
             raise ValidationError({"code": "Invalid or expired pairing code."})
 
-        if link is None:
+        try:
             link = CaregiverPatientLink.objects.create(
                 caregiver=caregiver,
                 patient=patient,
                 is_active=True,
                 can_view=True,
                 can_edit_medications=False,
+                can_confirm_doses=False,
                 notify_missed_doses=True,
                 consent_at=now,
             )
-        else:
-            link.is_active = True
-            link.can_view = True
-            link.can_edit_medications = False
-            link.notify_missed_doses = True
-            link.consent_at = now
-            link.revoked_at = None
-            link.save(
-                update_fields=[
-                    "is_active",
-                    "can_view",
-                    "can_edit_medications",
-                    "notify_missed_doses",
-                    "consent_at",
-                    "revoked_at",
-                    "updated_at",
-                ]
-            )
+        except IntegrityError:
+            raise Conflict("An active care relationship already exists.")
 
     _clear_failures(caregiver)
     return link

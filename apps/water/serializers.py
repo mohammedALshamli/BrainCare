@@ -9,6 +9,18 @@ from .services import record_intake
 
 class WaterReminderSettingsSerializer(serializers.ModelSerializer):
     patient = serializers.PrimaryKeyRelatedField(read_only=True)
+    interval_minutes = serializers.IntegerField(
+        required=False, min_value=15, max_value=720
+    )
+    daily_goal_ml = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=100,
+        max_value=20000,
+    )
+    cup_size_ml = serializers.IntegerField(
+        required=False, min_value=50, max_value=2000
+    )
 
     class Meta:
         model = WaterReminderSettings
@@ -45,6 +57,16 @@ class WaterReminderSettingsSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class WaterSummarySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    total_ml = serializers.IntegerField()
+    goal_ml = serializers.IntegerField(allow_null=True)
+    remaining_ml = serializers.IntegerField(allow_null=True)
+    progress_percentage = serializers.IntegerField(allow_null=True)
+    log_count = serializers.IntegerField()
+    goal_reached = serializers.BooleanField(allow_null=True)
+
+
 class WaterIntakeLogSerializer(serializers.ModelSerializer):
     patient = serializers.PrimaryKeyRelatedField(read_only=True)
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -54,6 +76,7 @@ class WaterIntakeLogSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "patient",
+            "client_event_id",
             "amount_ml",
             "consumed_at",
             "local_date",
@@ -66,6 +89,7 @@ class WaterIntakeLogSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "patient",
+            "client_event_id",
             "local_date",
             "created_by",
             "created_at",

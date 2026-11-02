@@ -88,6 +88,7 @@ class CaregiverPatientLink(models.Model):
     is_active = models.BooleanField(default=True)
     can_view = models.BooleanField(default=True)
     can_edit_medications = models.BooleanField(default=False)
+    can_confirm_doses = models.BooleanField(default=False)
     notify_missed_doses = models.BooleanField(default=True)
     consent_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
@@ -99,7 +100,8 @@ class CaregiverPatientLink(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["caregiver", "patient"],
-                name="unique_caregiver_patient_link",
+                condition=models.Q(is_active=True),
+                name="unique_active_caregiver_patient_link",
             ),
             models.CheckConstraint(
                 condition=~models.Q(caregiver=models.F("patient")),
@@ -109,6 +111,11 @@ class CaregiverPatientLink(models.Model):
                 condition=models.Q(can_edit_medications=False)
                 | models.Q(can_view=True),
                 name="edit_permission_requires_view",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(can_confirm_doses=False)
+                | models.Q(can_view=True),
+                name="confirm_permission_requires_view",
             ),
         ]
         indexes = [

@@ -4,7 +4,7 @@ from .models import DoseOccurrence, Medication, MedicationSchedule
 
 
 class MedicationFilter(django_filters.FilterSet):
-    patient = django_filters.UUIDFilter(field_name="patient_id")
+    patient = django_filters.NumberFilter(field_name="patient_id")
 
     class Meta:
         model = Medication
@@ -25,7 +25,7 @@ class MedicationScheduleFilter(django_filters.FilterSet):
 
 
 class DoseOccurrenceFilter(django_filters.FilterSet):
-    patient = django_filters.UUIDFilter(field_name="patient_id")
+    patient = django_filters.NumberFilter(field_name="patient_id")
     from_date = django_filters.DateFilter(
         field_name="scheduled_date", lookup_expr="gte"
     )
