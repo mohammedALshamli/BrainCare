@@ -1,0 +1,79 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Backend Test Suite (PostgreSQL 17 & Redis 7)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: braincare_test
+          POSTGRES_USER: braincare
+          POSTGRES_PASSWORD: braincare_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DATABASE_URL: postgres://braincare:braincare_test_password@localhost:5432/braincare_test
+      REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/development.txt
+
+      - name: Print connection vendor & verify PostgreSQL
+        run: |
+          python -c "import django; django.setup(); from django.db import connection; print(f'Database vendor: {connection.vendor}'); assert connection.vendor == 'postgresql', f'Expected postgresql, got {connection.vendor}'"
+
+      - name: Run test suite against PostgreSQL
+        id: run_tests
+        run: |
+          set -o pipefail
+          python manage.py test --no-input -v 2 2>&1 | tee test_output.log
+
+      - name: Verify no @requires_postgresql test was skipped
+        run: |
+          if grep -q "Commit-order concurrency requires PostgreSQL row locks" test_output.log; then
+            echo "ERROR: @requires_postgresql tests were skipped on PostgreSQL CI!"
+            exit 1
+          fi
+          echo "Verified: @requires_postgresql tests were executed against PostgreSQL."
+
+      - name: Validate OpenAPI specification
+        run: |
+          python manage.py spectacular --file docs/openapi.yaml --validate --fail-on-warn

@@ -63,6 +63,19 @@ them into the image or commit them.
    TLS-terminating load balancer.
 4. Run exactly one worker deployment and exactly one beat scheduler. Multiple
    beat schedulers duplicate periodic work.
+
+   > **Warning — single Celery Beat instance.** The default file-based or
+   > database-backed Celery Beat scheduler does **not** coordinate across
+   > replicas. Running more than one Beat process causes every periodic task
+   > (overdue-dose checks, stale-worker recovery, water reminders) to execute
+   > once per replica per interval, producing duplicate notifications and
+   > unnecessary database load.
+   >
+   > If you need high-availability Beat scheduling, adopt a distributed
+   > scheduler such as `django-celery-beat` with a database-backed schedule
+   > and a `redbeat` or `celery-singleton` lock, and verify that each periodic
+   > task is executed exactly once per interval. Do not simply scale the Beat
+   > deployment to multiple replicas without such a mechanism.
 5. Verify `/health/live/` and `/health/ready/` from inside the network. The
    readiness probe checks both the database and cache.
 6. Run the smoke tests below and monitor error rate, latency, queue depth, and

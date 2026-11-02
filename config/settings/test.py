@@ -11,12 +11,32 @@ SECRET_KEY = "test-only-secret-key-with-more-than-fifty-characters-000000"
 
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+import os
+
+_TEST_DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("TEST_DATABASE_URL")
+
+if _TEST_DATABASE_URL:
+    DATABASES = {"default": env.db_url_config(_TEST_DATABASE_URL)}  # noqa: F405
+    DATABASES["default"].setdefault("CONN_MAX_AGE", 0)
+elif os.environ.get("USE_POSTGRES", "").lower() in ("1", "true", "yes"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB", default="braincare_test"),  # noqa: F405
+            "USER": env("POSTGRES_USER", default="braincare"),  # noqa: F405
+            "PASSWORD": env("POSTGRES_PASSWORD", default="braincare"),  # noqa: F405
+            "HOST": env("POSTGRES_HOST", default="127.0.0.1"),  # noqa: F405
+            "PORT": env.int("POSTGRES_PORT", default=5432),  # noqa: F405
+            "CONN_MAX_AGE": 0,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",

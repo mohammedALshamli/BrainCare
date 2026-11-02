@@ -255,3 +255,48 @@ class OfflineCancelledDoseTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "cancelled")
+
+    def test_cancelled_dose_detail_returns_cancellation_fields_and_superseded_by(self):
+        occurrence = self.cancelled_occurrence()
+        response = self.client.get(
+            reverse("dose-detail", args=[occurrence.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertIsNotNone(data["cancelled_at"])
+        self.assertEqual(data["cancellation_reason"], "schedule_changed")
+        self.assertIsNotNone(data["superseded_by"])
+        self.assertIsNotNone(data["superseded_by_id"])
+        self.assertEqual(data["superseded_by"], data["superseded_by_id"])
+        # Verify superseded_by references a real replacement occurrence
+        replacement = DoseOccurrence.objects.get(pk=data["superseded_by"])
+        self.assertEqual(replacement.status, DoseOccurrence.Status.PENDING)
+
+    test_cancelled_dose_detail_exposes_cancellation_metadata = (
+        test_cancelled_dose_detail_returns_cancellation_fields_and_superseded_by
+    )
+
+    def test_pending_dose_detail_returns_null_cancellation_fields(self):
+        response = self.client.get(
+            reverse("dose-detail", args=[self.occurrence.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertIsNone(data["cancelled_at"])
+        self.assertEqual(data["cancellation_reason"], "")
+        self.assertIsNone(data["superseded_by"])
+        self.assertIsNone(data["superseded_by_id"])
+
+    def test_cancelled_dose_list_includes_cancellation_metadata(self):
+        self.cancelled_occurrence()
+        response = self.client.get(
+            reverse("dose-list"), {"status": "cancelled"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
+        row = response.data["results"][0]
+        self.assertIn("cancelled_at", row)
+        self.assertIn("cancellation_reason", row)
+        self.assertIn("superseded_by", row)
+        self.assertIn("superseded_by_id", row)
+        self.assertIsNotNone(row["cancelled_at"])

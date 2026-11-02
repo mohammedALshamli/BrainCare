@@ -52,6 +52,8 @@ class NotificationOutboxAdmin(admin.ModelAdmin):
         "next_attempt_at",
         "processing_started_at",
         "accepted_at",
+        "suppressed_at",
+        "suppression_reason",
         "last_error",
         "created_at",
         "updated_at",

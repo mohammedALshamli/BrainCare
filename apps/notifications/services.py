@@ -223,7 +223,10 @@ def _finish_accepted(outbox_id, now):
 def _finish_retry(outbox_id, reason, now):
     with transaction.atomic():
         outbox = NotificationOutbox.objects.select_for_update().get(pk=outbox_id)
-        if outbox.status == NotificationOutbox.Status.ACCEPTED:
+        if outbox.status in (
+            NotificationOutbox.Status.ACCEPTED,
+            NotificationOutbox.Status.SUPPRESSED,
+        ):
             return
         outbox.processing_started_at = None
         outbox.last_error = reason
@@ -328,6 +331,8 @@ def dispatch_outbox(outbox_id, now=None):
             return "already_accepted"
         if outbox.status == NotificationOutbox.Status.DEAD_LETTER:
             return "dead_letter"
+        if outbox.status == NotificationOutbox.Status.SUPPRESSED:
+            return "already_suppressed"
         if (
             outbox.status == NotificationOutbox.Status.PROCESSING
             and outbox.processing_started_at

@@ -88,6 +88,12 @@ or skip is still accepted against the cancelled row and is flagged with
 `confirmed_after_cancellation` or `skipped_after_cancellation`; the response
 also exposes `recorded_against_superseded` and `superseded_by_id`.
 
+Both `GET /api/v1/doses/` and `GET /api/v1/doses/{id}/` expose cancellation metadata
+as read-only fields:
+- `cancelled_at` (ISO 8601 timestamp or `null`)
+- `cancellation_reason` (`schedule_changed`, `schedule_deactivated`, `medication_deactivated`, or `""`)
+- `superseded_by` and `superseded_by_id` (UUID of the replacement occurrence, or `null`)
+
 ### Dose action body
 
 ```json

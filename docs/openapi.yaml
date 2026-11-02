@@ -2075,6 +2075,24 @@ components:
         snooze_count:
           type: integer
           readOnly: true
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+        superseded_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        superseded_by_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -2085,6 +2103,8 @@ components:
           readOnly: true
       required:
       - alert_status
+      - cancellation_reason
+      - cancelled_at
       - created_at
       - id
       - medication
@@ -2095,6 +2115,8 @@ components:
       - snooze_count
       - snoozed_until
       - status
+      - superseded_by
+      - superseded_by_id
       - taken_at
       - updated_at
     DoseOccurrenceStatusEnum:

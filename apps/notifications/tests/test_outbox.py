@@ -366,3 +366,58 @@ class DispatchTests(OutboxTestBase):
         self.assertEqual(result, "retry")
         outbox.refresh_from_db()
         self.assertEqual(outbox.status, NotificationOutbox.Status.DEAD_LETTER)
+
+    def test_dispatch_outbox_on_suppressed_record_exits_early_without_sending(self):
+        outbox = self.make_outbox(key="suppressed-test")
+        now = timezone.now()
+        NotificationOutbox.objects.filter(pk=outbox.pk).update(
+            status=NotificationOutbox.Status.SUPPRESSED,
+            suppressed_at=now,
+            suppression_reason="stale_dose_already_resolved",
+        )
+
+        with patch("apps.notifications.services.send_push") as sender:
+            result = dispatch_outbox(outbox.pk)
+
+        self.assertEqual(result, "already_suppressed")
+        sender.assert_not_called()
+        outbox.refresh_from_db()
+        self.assertEqual(outbox.status, NotificationOutbox.Status.SUPPRESSED)
+
+    def test_finish_retry_does_not_change_suppressed_status(self):
+        from apps.notifications.services import _finish_retry
+
+        outbox = self.make_outbox(key="suppressed-retry-test")
+        now = timezone.now()
+        NotificationOutbox.objects.filter(pk=outbox.pk).update(
+            status=NotificationOutbox.Status.SUPPRESSED,
+            suppressed_at=now,
+            suppression_reason="stale_dose_already_resolved",
+        )
+
+        _finish_retry(outbox.pk, "provider_transient", now)
+
+        outbox.refresh_from_db()
+        self.assertEqual(outbox.status, NotificationOutbox.Status.SUPPRESSED)
+        self.assertEqual(
+            outbox.suppression_reason, "stale_dose_already_resolved"
+        )
+
+    def test_dispatch_suppressed_non_dose_overdue_exits_early(self):
+        """SUPPRESSED guard applies to all notification types, not just DOSE_OVERDUE."""
+        outbox = self.make_outbox(
+            key="suppressed-system-test",
+            notification_type=NotificationOutbox.NotificationType.SYSTEM,
+        )
+        now = timezone.now()
+        NotificationOutbox.objects.filter(pk=outbox.pk).update(
+            status=NotificationOutbox.Status.SUPPRESSED,
+            suppressed_at=now,
+            suppression_reason="test_suppression",
+        )
+
+        with patch("apps.notifications.services.send_push") as sender:
+            result = dispatch_outbox(outbox.pk)
+
+        self.assertEqual(result, "already_suppressed")
+        sender.assert_not_called()

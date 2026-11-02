@@ -197,6 +197,12 @@ class DoseScheduleSerializer(serializers.ModelSerializer):
 class DoseOccurrenceSerializer(serializers.ModelSerializer):
     medication = DoseMedicationSerializer(read_only=True)
     schedule = DoseScheduleSerializer(read_only=True)
+    superseded_by = serializers.PrimaryKeyRelatedField(
+        read_only=True, allow_null=True
+    )
+    superseded_by_id = serializers.PrimaryKeyRelatedField(
+        source="superseded_by", read_only=True, allow_null=True
+    )
 
     class Meta:
         model = DoseOccurrence
@@ -212,6 +218,10 @@ class DoseOccurrenceSerializer(serializers.ModelSerializer):
             "skipped_at",
             "snoozed_until",
             "snooze_count",
+            "cancelled_at",
+            "cancellation_reason",
+            "superseded_by",
+            "superseded_by_id",
             "created_at",
             "updated_at",
         )
